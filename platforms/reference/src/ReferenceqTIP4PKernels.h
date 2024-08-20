@@ -77,13 +77,9 @@ private:
 
     void HOHAngleEnergyForces(Vec3& r1, Vec3& r2, double& d1, double& d2, Vec3& F_O, Vec3& F_H1, Vec3& F_H2, double& Vxyz);
     
-    void OOLennardJonesEnergyForces(Vec3& rOO, Vec3& F_OO, double& Vxyz);
+    void LennardJonesEnergyForces(int& atomA, int& atomB, Vec3& r, const double& C, const double& D, vector<Vec3>& forces, double& energy);
 
-    void HHCoulombicEnergyForces(Vec3& rHH, Vec3& F_HH, double& Vxyz);
-
-    void HMCoulombicEnergyForces(Vec3& rHM, Vec3& F_HM, double& Vxyz);
-
-    void MMCoulombicEnergyForces(Vec3& rMM, Vec3& F_MM, double& Vxyz);
+    void CoulombicEnergyForces(int& atomA, int& atomB, Vec3& r, const double& keqq, vector<Vec3>& forces, double& energy);
 
     std::vector<int> particles_O, particles_H1, particles_H2, particles_M;
     
@@ -112,6 +108,8 @@ private:
 
     const double AOO = 4*epsilon_O*pow(sigma_O, 12);
     const double BOO = 4*epsilon_O*pow(sigma_O, 6);
+    const double COO = sigma_O*sigma_O;
+    const double DOO = 4*epsilon_O;
     const double ke = 1/(4*M_PI*EPSILON0);
     const double keqHqH = ke*charge_H*charge_H;
     const double keqHqM = ke*charge_H*charge_M;

@@ -37,6 +37,7 @@
 #include "openmm/reference/ReferencePlatform.h"
 #include <cmath>
 #include <vector>
+#include <omp.h>
 
 using namespace qTIP4PPlugin;
 using namespace OpenMM;
@@ -63,33 +64,28 @@ double ReferenceCalcqTIP4PForceKernel::execute(ContextImpl& context, bool includ
 
     int numWaters = particles_O.size();
 
-    double energy = 0;
+    double energy = 0, V;
 
-    int particle_O, particle_H1, particle_H2, particle_M;
-
-    Vec3 F_O, F_H1, F_H2, r1, r2, pos1_O, pos1_H1, pos1_H2, pos1_M, pos2_O, pos2_H1, pos2_H2, pos2_M;
-    double d1, d2, V;
+    Vec3 F_O, F_H1, F_H2, F_HM, F_MM;
     
-    int water1_O, water1_H1, water1_H2, water1_M, water2_O, water2_H1, water2_H2, water2_M;
-    Vec3 rOO, rHH, rHM, rMM, F_HM, F_MM;
-    
+    #pragma omp parallel for
     for (int index1 = 0; index1 < numWaters; index1++) {
         // intramolecular forces
-        water1_O = particles_O[index1];
-        water1_H1 = particles_H1[index1];
-        water1_H2 = particles_H2[index1];
-        water1_M = particles_M[index1];
+        int water1_O = particles_O[index1];
+        int water1_H1 = particles_H1[index1];
+        int water1_H2 = particles_H2[index1];
+        int water1_M = particles_M[index1];
 
-        pos1_O = pos[water1_O];
-        pos1_H1 = pos[water1_H1];
-        pos1_H2 = pos[water1_H2];
-        pos1_M = pos[water1_M];
+        Vec3 pos1_O = pos[water1_O];
+        Vec3 pos1_H1 = pos[water1_H1];
+        Vec3 pos1_H2 = pos[water1_H2];
+        Vec3 pos1_M = pos[water1_M];
 
-        r1 = pos1_H1 - pos1_O;
-        r2 = pos1_H2 - pos1_O;
+        Vec3 r1 = pos1_H1 - pos1_O;
+        Vec3 r2 = pos1_H2 - pos1_O;
 
-        d1 = sqrt(r1.dot(r1));
-        d2 = sqrt(r2.dot(r2));
+        double d1 = sqrt(r1.dot(r1));
+        double d2 = sqrt(r2.dot(r2));
         
         OHBondEnergyForces(r1, r2, d1, d2, F_O, F_H1, F_H2, V);
 
@@ -111,79 +107,49 @@ double ReferenceCalcqTIP4PForceKernel::execute(ContextImpl& context, bool includ
             
             // intermolecular forces
             
-            water2_O = particles_O[index2];
-            water2_H1 = particles_H1[index2];
-            water2_H2 = particles_H2[index2];
-            water2_M = particles_M[index2];
+            int water2_O = particles_O[index2];
+            int water2_H1 = particles_H1[index2];
+            int water2_H2 = particles_H2[index2];
+            int water2_M = particles_M[index2];
 
-            pos2_O = pos[water2_O];
-            pos2_H1 = pos[water2_H1];
-            pos2_H2 = pos[water2_H2];
-            pos2_M = pos[water2_M];
+            Vec3 pos2_O = pos[water2_O];
+            Vec3 pos2_H1 = pos[water2_H1];
+            Vec3 pos2_H2 = pos[water2_H2];
+            Vec3 pos2_M = pos[water2_M];
 
             // LJ OO
-            rOO = pos2_O - pos1_O;
-            OOLennardJonesEnergyForces(rOO, F_O, V);
-            force[water2_O] += F_O;
-            force[water1_O] -= F_O;
-            energy += V;
+            Vec3 rOO = pos2_O - pos1_O;
+            LennardJonesEnergyForces(water2_O, water1_O, rOO, COO, DOO, force, energy);
             
             // Coulombic HH
-            rHH = pos2_H1 - pos1_H1;
-            HHCoulombicEnergyForces(rHH, F_H1, V);
-            force[water2_H1] += F_H1;
-            force[water1_H1] -= F_H1;
-            energy += V;
+            Vec3 rH1H1 = pos2_H1 - pos1_H1;
+            CoulombicEnergyForces(water2_H1, water1_H1, rH1H1, keqHqH, force, energy);
 
-            rHH = pos2_H1 - pos1_H2;
-            HHCoulombicEnergyForces(rHH, F_H1, V);
-            force[water2_H1] += F_H1;
-            force[water1_H2] -= F_H1;
-            energy += V;
+            Vec3 rH1H2 = pos2_H1 - pos1_H2;
+            CoulombicEnergyForces(water2_H1, water1_H2, rH1H2, keqHqH, force, energy);
 
-            rHH = pos2_H2 - pos1_H1;
-            HHCoulombicEnergyForces(rHH, F_H2, V);
-            force[water2_H2] += F_H2;
-            force[water1_H1] -= F_H2;
-            energy += V;
+            Vec3 rH2H1 = pos2_H2 - pos1_H1;
+            CoulombicEnergyForces(water2_H2, water1_H1, rH2H1, keqHqH, force, energy);
 
-            rHH = pos2_H2 - pos1_H2;
-            HHCoulombicEnergyForces(rHH, F_H2, V);
-            force[water2_H2] += F_H2;
-            force[water1_H2] -= F_H2;
-            energy += V;
+            Vec3 rH2H2 = pos2_H2 - pos1_H2;
+            CoulombicEnergyForces(water2_H2, water1_H2, rH2H2, keqHqH, force, energy);
 
             // Coulombic HM
-            rHM = pos2_H1 - pos1_M;
-            HMCoulombicEnergyForces(rHM, F_HM, V);
-            force[water2_H1] += F_HM;
-            force[water1_M] -= F_HM;
-            energy += V;
+            Vec3 rH1M = pos2_H1 - pos1_M;
+            CoulombicEnergyForces(water2_H1, water1_M, rH1M, keqHqM, force, energy);
 
-            rHM = pos2_H2 - pos1_M;
-            HMCoulombicEnergyForces(rHM, F_HM, V);
-            force[water2_H2] += F_HM;
-            force[water1_M] -= F_HM;
-            energy += V;
+            Vec3 rH2M = pos2_H2 - pos1_M;
+            CoulombicEnergyForces(water2_H2, water1_M, rH2M, keqHqM, force, energy);
 
-            rHM = pos2_M - pos1_H1;
-            HMCoulombicEnergyForces(rHM, F_HM, V);
-            force[water2_M] += F_HM;
-            force[water1_H1] -= F_HM;
-            energy += V;
+            Vec3 rMH1 = pos2_M - pos1_H1;
+            CoulombicEnergyForces(water2_M, water1_H1, rMH1, keqHqM, force, energy);
 
-            rHM = pos2_M - pos1_H2;
-            HMCoulombicEnergyForces(rHM, F_HM, V);
-            force[water2_M] += F_HM;
-            force[water1_H2] -= F_HM;
-            energy += V;
+            Vec3 rMH2 = pos2_M - pos1_H2;
+            CoulombicEnergyForces(water2_M, water1_H2, rMH2, keqHqM, force, energy);
 
             // Coulombic MM
-            rMM = pos2_M - pos1_M;
-            MMCoulombicEnergyForces(rMM, F_MM, V);
-            force[water2_M] += F_MM;
-            force[water1_M] -= F_MM;
-            energy += V;     
+            Vec3 rMM = pos2_M - pos1_M;
+            CoulombicEnergyForces(water2_M, water1_M, rMM, keqMqM, force, energy);
         }
         
     }
@@ -226,37 +192,36 @@ void ReferenceCalcqTIP4PForceKernel::HOHAngleEnergyForces(Vec3& r1, Vec3& r2, do
     F_O = -(F_H1 + F_H2);
 }
 
-void ReferenceCalcqTIP4PForceKernel::OOLennardJonesEnergyForces(Vec3& rOO, Vec3& F_OO, double& Vxyz) {
-    double dOO2 = rOO.dot(rOO);
+void ReferenceCalcqTIP4PForceKernel::LennardJonesEnergyForces(int& atomA, int& atomB, Vec3& r, const double& C, const double& D, vector<Vec3>& forces, double& energy) {
+    double d2inv = 1./r.dot(r);
+    double beta = C*d2inv;
 
-    double dOO6inv = pow(dOO2, -3);
-    double dOO12inv = dOO6inv*dOO6inv;
+    double beta3 = beta*beta*beta;
+    double beta6 = beta3*beta3;
     
-    Vxyz = AOO*dOO12inv - BOO*dOO6inv;
+    energy += D*(beta3 - 1.0)*beta3;;
 
-    F_OO = (12*dOO12inv*AOO - 6*dOO6inv*BOO)/dOO2*rOO;
+    double dVdr = D*(12.0*beta3 - 6.0)*beta3*d2inv;
+
+    for (int k=0; k<3; k++){
+        double force = dVdr*r[k];
+        forces[atomA][k] += force;
+        forces[atomB][k] -= force;
+    }
 }
 
-void ReferenceCalcqTIP4PForceKernel::HHCoulombicEnergyForces(Vec3& rHH, Vec3& F_HH, double& Vxyz) {
-    double dHH2inv = 1./rHH.dot(rHH);
+void ReferenceCalcqTIP4PForceKernel::CoulombicEnergyForces(int& atomA, int& atomB, Vec3& r, const double& keqq, vector<Vec3>& forces, double& energy) {
+    double d2inv = 1./r.dot(r);
+    double dinv = sqrt(d2inv);
+    double V = keqq*dinv;
 
-    Vxyz = keqHqH*sqrt(dHH2inv);
+    energy += V;
 
-    F_HH = Vxyz*dHH2inv*rHH;
-}
+    double dVdr = V*d2inv;
 
-void ReferenceCalcqTIP4PForceKernel::HMCoulombicEnergyForces(Vec3& rHM, Vec3& F_HM, double& Vxyz) {
-    double dHM2inv = 1./rHM.dot(rHM);
-
-    Vxyz = keqHqM*sqrt(dHM2inv);
-
-    F_HM = Vxyz*dHM2inv*rHM;
-}
-
-void ReferenceCalcqTIP4PForceKernel::MMCoulombicEnergyForces(Vec3& rMM, Vec3& F_MM, double& Vxyz) {
-    double dMM2inv = 1./rMM.dot(rMM);
-
-    Vxyz = keqMqM*sqrt(dMM2inv);
-
-    F_MM = Vxyz*dMM2inv*rMM;
+    for (int k=0; k<3; k++){
+        double force = dVdr*r[k];
+        forces[atomA][k] += force;
+        forces[atomB][k] -= force;
+    }
 }
