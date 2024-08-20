@@ -68,7 +68,6 @@ double ReferenceCalcqTIP4PForceKernel::execute(ContextImpl& context, bool includ
 
     Vec3 F_O, F_H1, F_H2, F_HM, F_MM;
     
-    #pragma omp parallel for
     for (int index1 = 0; index1 < numWaters; index1++) {
         // intramolecular forces
         int water1_O = particles_O[index1];
