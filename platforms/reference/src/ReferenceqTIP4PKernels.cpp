@@ -38,6 +38,7 @@
 #include <cmath>
 #include <vector>
 #include <omp.h>
+#include <iostream>
 
 using namespace qTIP4PPlugin;
 using namespace OpenMM;
@@ -56,9 +57,30 @@ static vector<Vec3>& extractForces(ContextImpl& context) {
 
 void ReferenceCalcqTIP4PForceKernel::initialize(const System& system, const qTIP4PForce& force) {
     force.getParticles(particles_O, particles_H1, particles_H2, particles_M);
+
+    tabulated = false;
+
+    if (force.isTabulated()) {
+        tabulated = true;
+        force.getTabulatedParameters(dmin, dmax, prec_N, rescaling_N);
+        tabulateHH_MH();
+    }
 }
 
-double ReferenceCalcqTIP4PForceKernel::execute(ContextImpl& context, bool includeForces, bool includeEnergy) {
+double ReferenceCalcqTIP4PForceKernel::execute(ContextImpl& context, bool includeForces, bool includeEnergy){
+    double energy;
+    
+    if (tabulated)
+        energy = executeTabulated(context);
+    else
+        energy = executeAnalytical(context);
+
+    return energy;
+}
+
+double ReferenceCalcqTIP4PForceKernel::executeAnalytical(ContextImpl& context) {
+    //cout << "executing analytical" << endl;
+
     vector<Vec3>& pos = extractPositions(context);
     vector<Vec3>& force = extractForces(context);
 
@@ -157,6 +179,106 @@ double ReferenceCalcqTIP4PForceKernel::execute(ContextImpl& context, bool includ
 }
 
 
+double ReferenceCalcqTIP4PForceKernel::executeTabulated(ContextImpl& context) {
+    //cout << "executing tabulated" << endl;
+
+    vector<Vec3>& pos = extractPositions(context);
+    vector<Vec3>& force = extractForces(context);
+
+    int numWaters = particles_O.size();
+
+    double energy = 0, V;
+
+    Vec3 F_O, F_H1, F_H2, F_HM, F_MM;
+    
+    for (int index1 = 0; index1 < numWaters; index1++) {
+        // intramolecular forces
+        int water1_O = particles_O[index1];
+        int water1_H1 = particles_H1[index1];
+        int water1_H2 = particles_H2[index1];
+        int water1_M = particles_M[index1];
+
+        Vec3 pos1_O = pos[water1_O];
+        Vec3 pos1_H1 = pos[water1_H1];
+        Vec3 pos1_H2 = pos[water1_H2];
+        Vec3 pos1_M = pos[water1_M];
+
+        Vec3 r1 = pos1_H1 - pos1_O;
+        Vec3 r2 = pos1_H2 - pos1_O;
+
+        double d1 = sqrt(r1.dot(r1));
+        double d2 = sqrt(r2.dot(r2));
+        
+        OHBondEnergyForces(r1, r2, d1, d2, F_O, F_H1, F_H2, V);
+
+        force[water1_O] += F_O;
+        force[water1_H1] += F_H1;
+        force[water1_H2] += F_H2;
+
+        energy += V;
+        
+        HOHAngleEnergyForces(r1, r2, d1, d2, F_O, F_H1, F_H2, V);
+
+        force[water1_O] += F_O;
+        force[water1_H1] += F_H1;
+        force[water1_H2] += F_H2;
+
+        energy += V;
+        
+        for (int index2 = index1 + 1; index2 < numWaters; index2++) {
+            
+            // intermolecular forces
+            
+            int water2_O = particles_O[index2];
+            int water2_H1 = particles_H1[index2];
+            int water2_H2 = particles_H2[index2];
+            int water2_M = particles_M[index2];
+
+            Vec3 pos2_O = pos[water2_O];
+            Vec3 pos2_H1 = pos[water2_H1];
+            Vec3 pos2_H2 = pos[water2_H2];
+            Vec3 pos2_M = pos[water2_M];
+
+            // LJ OO
+            Vec3 rOO = pos2_O - pos1_O;
+            LennardJonesEnergyForces(water2_O, water1_O, rOO, COO, DOO, force, energy);
+            
+            // Coulombic HH
+            Vec3 rH1H1 = pos2_H1 - pos1_H1;
+            tabulatedCoulombicEnergyForcesHH(water2_H1, water1_H1, rH1H1, force, energy);
+
+            Vec3 rH1H2 = pos2_H1 - pos1_H2;
+            tabulatedCoulombicEnergyForcesHH(water2_H1, water1_H2, rH1H2, force, energy);
+
+            Vec3 rH2H1 = pos2_H2 - pos1_H1;
+            tabulatedCoulombicEnergyForcesHH(water2_H2, water1_H1, rH2H1, force, energy);
+
+            Vec3 rH2H2 = pos2_H2 - pos1_H2;
+            tabulatedCoulombicEnergyForcesHH(water2_H2, water1_H2, rH2H2, force, energy);
+
+            // Coulombic HM
+            Vec3 rH1M = pos2_H1 - pos1_M;
+            tabulatedCoulombicEnergyForcesMH(water2_H1, water1_M, rH1M, force, energy);
+
+            Vec3 rH2M = pos2_H2 - pos1_M;
+            tabulatedCoulombicEnergyForcesMH(water2_H2, water1_M, rH2M, force, energy);
+
+            Vec3 rMH1 = pos2_M - pos1_H1;
+            tabulatedCoulombicEnergyForcesMH(water2_M, water1_H1, rMH1, force, energy);
+
+            Vec3 rMH2 = pos2_M - pos1_H2;
+            tabulatedCoulombicEnergyForcesMH(water2_M, water1_H2, rMH2, force, energy);
+
+            // Coulombic MM
+            Vec3 rMM = pos2_M - pos1_M;
+            CoulombicEnergyForces(water2_M, water1_M, rMM, keqMqM, force, energy);
+        }
+        
+    }
+    
+    return energy;
+}
+
 void ReferenceCalcqTIP4PForceKernel::OHBondEnergyForces(Vec3& r1, Vec3& r2, double& d1, double& d2, Vec3& F_O, Vec3& F_H1, Vec3& F_H2, double& Vxyz) {
 
     double d1d = d1-r0;
@@ -222,5 +344,84 @@ void ReferenceCalcqTIP4PForceKernel::CoulombicEnergyForces(int& atomA, int& atom
         double force = dVdr*r[k];
         forces[atomA][k] += force;
         forces[atomB][k] -= force;
+    }
+}
+
+void ReferenceCalcqTIP4PForceKernel::tabulateHH_MH() {
+    double alpha = keqHqH;
+
+    qmin = d_to_q(dmin);
+    double qmax = d_to_q(dmax);
+    double kmin = d_to_k(dmin);
+    double kmax = d_to_k(dmax);
+    // computing the potential and force arrays
+    double dk_prec = (kmax - kmin)/(prec_N-1);
+    tabulated_V_HH.resize(prec_N);
+    tabulated_F_HH.resize(prec_N);
+
+    tabulated_V_MH.resize(prec_N);
+    tabulated_F_MH.resize(prec_N);
+    
+    for (int i = 0; i < prec_N; i++) {
+        double k_prec = i*dk_prec + kmin;
+        double d_prec = k_to_d(k_prec);
+        tabulated_V_HH[i] = keqHqH/d_prec; // Coulombic potential
+        tabulated_F_HH[i] = -keqHqH/(d_prec*d_prec*d_prec); // Coulombic force divided by d (multiply by vector r to get force in xyz) 
+
+        tabulated_V_MH[i] = keqHqM/d_prec; // Coulombic potential
+        tabulated_F_MH[i] = -keqHqM/(d_prec*d_prec*d_prec); // Coulombic force divided by d (multiply by vector r to get force in xyz) 
+    }
+
+    // computing the rescaling array
+    double dq_rescaling = (qmax - qmin)/(rescaling_N-1);
+    tabulated_rescaling_HH_MH.resize(rescaling_N);
+    
+    for (int i = 0; i < rescaling_N; i++) {
+        
+        double q_S = i*dq_rescaling + qmin;
+        double k_S = q_to_k(q_S);
+        double S = (k_S - kmin)/(kmax - kmin)*(prec_N - 1);
+
+        tabulated_rescaling_HH_MH[i] = S + 0.5;
+    }
+
+    one_by_dq_HH_MH = 1/(qmax - qmin)*(rescaling_N-1);
+}
+
+void ReferenceCalcqTIP4PForceKernel::tabulatedCoulombicEnergyForcesHH(int& atomA, int& atomB, Vec3& r, vector<Vec3>& forces, double& energy) {
+    double d2 = r.dot(r);
+
+    int i = (d2 - qmin)*one_by_dq_HH_MH + 0.5;
+    i = max(0, min(prec_N-1, i));
+
+    int j = tabulated_rescaling_HH_MH[i];
+
+    energy += tabulated_V_HH[j];
+
+    double dVdr = tabulated_F_HH[j];
+
+    for (int k=0; k<3; k++){
+        double force = dVdr*r[k];
+        forces[atomA][k] -= force;
+        forces[atomB][k] += force;
+    }
+}
+
+void ReferenceCalcqTIP4PForceKernel::tabulatedCoulombicEnergyForcesMH(int& atomA, int& atomB, Vec3& r, vector<Vec3>& forces, double& energy) {
+    double d2 = r.dot(r);
+
+    int i = (d2 - qmin)*one_by_dq_HH_MH + 0.5;
+    i = max(0, min(prec_N-1, i));
+
+    int j = tabulated_rescaling_HH_MH[i];
+
+    energy += tabulated_V_MH[j];
+
+    double dVdr = tabulated_F_MH[j];
+
+    for (int k=0; k<3; k++){
+        double force = dVdr*r[k];
+        forces[atomA][k] -= force;
+        forces[atomB][k] += force;
     }
 }

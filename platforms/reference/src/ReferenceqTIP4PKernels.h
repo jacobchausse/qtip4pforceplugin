@@ -73,6 +73,10 @@ public:
      */
 private:
 
+    double executeAnalytical(ContextImpl& context);
+
+    double executeTabulated(ContextImpl& context);
+
     void OHBondEnergyForces(Vec3& r1, Vec3& r2, double& d1, double& d2, Vec3& F_O, Vec3& F_H1, Vec3& F_H2, double& Vxyz);
 
     void HOHAngleEnergyForces(Vec3& r1, Vec3& r2, double& d1, double& d2, Vec3& F_O, Vec3& F_H1, Vec3& F_H2, double& Vxyz);
@@ -81,8 +85,40 @@ private:
 
     void CoulombicEnergyForces(int& atomA, int& atomB, Vec3& r, const double& keqq, vector<Vec3>& forces, double& energy);
 
-    std::vector<int> particles_O, particles_H1, particles_H2, particles_M;
+    void tabulateHH_MH();
+
+    void tabulatedCoulombicEnergyForcesHH(int& atomA, int& atomB, Vec3& r, vector<Vec3>& forces, double& energy);
+
+    void tabulatedCoulombicEnergyForcesMH(int& atomA, int& atomB, Vec3& r, vector<Vec3>& forces, double& energy);
+
+    double d_to_q(double d) {return d*d;}
+    double q_to_d(double q) {return sqrt(q);}
+
+    double d_to_k(double d) {return d;}
+    double k_to_d(double k) {return k;}
+
+    double q_to_k(double q) {return d_to_k(q_to_d(q));}
+    double k_to_q(double k) {return d_to_q(k_to_d(k));}
+
+    int index_4d_to_1d(int i, int j, int k, int l, int N) {return l+N*(k+N*(j+N*i));}    
     
+    bool tabulated;
+
+    std::vector<double> tabulated_V_HH;
+    std::vector<double> tabulated_F_HH;
+
+    std::vector<double> tabulated_V_MH;
+    std::vector<double> tabulated_F_MH;
+    
+    std::vector<int> tabulated_rescaling_HH_MH;
+
+    double one_by_dq_HH_MH, qmin;
+    double dmin, dmax;
+    int prec_N, rescaling_N;
+    
+    
+    std::vector<int> particles_O, particles_H1, particles_H2, particles_M;
+
     const double angle0=1.87448361664;
     const double k=367.6;
 

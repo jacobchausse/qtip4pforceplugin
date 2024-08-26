@@ -38,7 +38,22 @@ using namespace qTIP4PPlugin;
 using namespace OpenMM;
 using namespace std;
 
-qTIP4PForce::qTIP4PForce() {
+qTIP4PForce::qTIP4PForce(bool tabulate, double dmin, double dmax, int prec_N, int rescaling_N) {
+    tabulated = false;
+    if (tabulate) {
+        if (dmax <= dmin)
+            throw OpenMMException("GriddedExternalForce: dmax <= dmin.");
+        if (prec_N < 10)
+            throw OpenMMException("GriddedExternalForce: prec_N must be >=10.");
+        if (rescaling_N < 10)
+            throw OpenMMException("GriddedExternalForce: rescaling_N must be >=10.");
+
+        tabulated = true;
+        this->dmin = dmin;
+        this->dmax = dmax;
+        this->prec_N = prec_N;
+        this->rescaling_N = rescaling_N;
+    }
 }
 
 int qTIP4PForce::getNumWaters() const {
@@ -67,6 +82,15 @@ void qTIP4PForce::getParticles(std::vector<int>& particles_O, std::vector<int>& 
     particles_H2 = this->particles_H2;
     particles_M = this->particles_M;
 }
+
+void qTIP4PForce::getTabulatedParameters(double& dmin, double& dmax, int& prec_N, int& rescaling_N) const {
+    dmin = this->dmin;
+    dmax = this->dmax;
+    prec_N = this->prec_N;
+    rescaling_N = this->rescaling_N; 
+}
+
+bool qTIP4PForce::isTabulated() const {return tabulated;}
 
 ForceImpl* qTIP4PForce::createImpl() const {
     return new qTIP4PForceImpl(*this);

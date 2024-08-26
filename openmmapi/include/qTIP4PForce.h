@@ -47,7 +47,7 @@ namespace qTIP4PPlugin {
 class OPENMM_EXPORT_EXAMPLE qTIP4PForce : public OpenMM::Force {
 public:
 
-    qTIP4PForce();
+    qTIP4PForce(bool tabulate=false, double dmin=0, double dmax=0, int prec_N=0, int rescaling_N=0);
 
     int getNumWaters() const;
 
@@ -57,10 +57,18 @@ public:
     
     void getParticles(std::vector<int>& particles_O, std::vector<int>& particles_H1, std::vector<int>& particles_H2, std::vector<int>& particles_M) const;
 
+    void getTabulatedParameters(double& dmin, double& dmax, int& prec_N, int& rescaling_N) const;
+
+    bool isTabulated() const;
+
 protected:
     OpenMM::ForceImpl* createImpl() const;
 private:
     std::vector<int> particles_O, particles_H1, particles_H2, particles_M;
+
+    bool tabulated;
+    double dmin, dmax;
+    int prec_N, rescaling_N;
 };
 
 } // namespace qTIP4PPlugin

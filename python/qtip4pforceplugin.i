@@ -46,7 +46,7 @@ namespace qTIP4PPlugin {
 
 class qTIP4PForce : public OpenMM::Force {
 public:
-    qTIP4PForce();
+    qTIP4PForce(bool tabulate=false, double dmin=0.0, double dmax=0.0, int prec_N=0, int rescaling_N=0);
 
     int qTIP4PForce::getNumWaters() const;
 
@@ -65,6 +65,8 @@ public:
     %clear int& particle_H1;
     %clear int& particle_H2;
     %clear int& particle_M;
+
+    bool qTIP4PForce::isTabulated() const;
 
     /*
      * Add methods for casting a Force to an qTIP4PForce.
