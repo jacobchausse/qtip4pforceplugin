@@ -26,5 +26,5 @@ extension = Extension(name='_qtip4pforceplugin',
 setup(name='qtip4pforceplugin',
       version='1.0',
       py_modules=['qtip4pforceplugin'],
-      ext_modules=[extension],
+      ext_modules=[extension]
      )
