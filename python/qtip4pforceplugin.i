@@ -66,6 +66,8 @@ public:
     %clear int& particle_H2;
     %clear int& particle_M;
 
+    void qTIP4PForce::setNumNearestNeighbours(int num);
+
     /*
      * Add methods for casting a Force to an qTIP4PForce.
     */
@@ -86,7 +88,7 @@ public:
 
 import warnings
 
-def replaceWaters(system: mm.System, topology: mm.app.Topology):
+def replaceWaters(system: mm.System, topology: mm.app.Topology, num_nearest_neighbours: int=0):
     """Replaces all the water-water and intra-water forces in the system with the qTIP4P force plugin. Does not affect other water-system interactions
 
     Parameters
@@ -95,11 +97,14 @@ def replaceWaters(system: mm.System, topology: mm.app.Topology):
         System where the water forces should be replaced.
     topology : Topology
         Topology used to create the system.
+    num_nearest_neighbours : int, optional
+        Used for 1D water chains, set the number of nearest neighbours to interact (waters must be in order). Default is 0, which will compute all interactions.
     """
 
     warnings.warn('\'replaceWaters\' is not the most robust function, double-checking that accurate forces are being calculated is encouraged.')
 
     qtip4pforce = qTIP4PForce()
+    qtip4pforce.setNumNearestNeighbours(num_nearest_neighbours)
     system.addForce(qtip4pforce)
 
     energy_expression_OH_bond = 'D*(a^2*(r-r0)^2-a^3*(r-r0)^3+(7/12)*a^4*(r-r0)^4)'
