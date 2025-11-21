@@ -56,6 +56,7 @@ static vector<Vec3>& extractForces(ContextImpl& context) {
 
 void ReferenceCalcqTIP4PForceKernel::initialize(const System& system, const qTIP4PForce& force) {
     force.getParticles(particles_O, particles_H1, particles_H2, particles_M);
+    num_nearest_neighbours = force.getNumNearestNeighbours();
 }
 
 double ReferenceCalcqTIP4PForceKernel::execute(ContextImpl& context, bool includeForces, bool includeEnergy) {
@@ -67,6 +68,7 @@ double ReferenceCalcqTIP4PForceKernel::execute(ContextImpl& context, bool includ
     double energy = 0, V;
 
     Vec3 F_O, F_H1, F_H2, F_HM, F_MM;
+    int max_index2;
     
     for (int index1 = 0; index1 < numWaters; index1++) {
         // intramolecular forces
@@ -101,8 +103,16 @@ double ReferenceCalcqTIP4PForceKernel::execute(ContextImpl& context, bool includ
         force[water1_H2] += F_H2;
 
         energy += V;
+
+        if (num_nearest_neighbours == 0) {
+            max_index2 = numWaters;
+        }
+        else {
+            max_index2 = min(index1 + num_nearest_neighbours + 1, numWaters);
+        }
+
         
-        for (int index2 = index1 + 1; index2 < numWaters; index2++) {
+        for (int index2 = index1 + 1; index2 < max_index2; index2++) {
             
             // intermolecular forces
             

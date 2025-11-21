@@ -82,7 +82,8 @@ private:
     void CoulombicEnergyForces(int& atomA, int& atomB, Vec3& r, const double& keqq, vector<Vec3>& forces, double& energy);
 
     std::vector<int> particles_O, particles_H1, particles_H2, particles_M;
-    
+    int num_nearest_neighbours;
+
     const double angle0=1.87448361664;
     const double k=367.6;
 

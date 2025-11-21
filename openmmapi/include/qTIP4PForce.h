@@ -57,10 +57,15 @@ public:
     
     void getParticles(std::vector<int>& particles_O, std::vector<int>& particles_H1, std::vector<int>& particles_H2, std::vector<int>& particles_M) const;
 
+    void setNumNearestNeighbours(int num=0);
+
+    int getNumNearestNeighbours() const;
+
 protected:
     OpenMM::ForceImpl* createImpl() const;
 private:
     std::vector<int> particles_O, particles_H1, particles_H2, particles_M;
+    int num_nearest_neighbours;
 };
 
 } // namespace qTIP4PPlugin

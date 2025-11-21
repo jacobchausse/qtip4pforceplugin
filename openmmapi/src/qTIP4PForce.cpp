@@ -68,6 +68,17 @@ void qTIP4PForce::getParticles(std::vector<int>& particles_O, std::vector<int>& 
     particles_M = this->particles_M;
 }
 
+void qTIP4PForce::setNumNearestNeighbours(int num) {
+    if (num < 0) {
+        throw OpenMMException("The number of nearest neighbours must be >=0!");
+    }
+    num_nearest_neighbours = num;
+}
+
+int qTIP4PForce::getNumNearestNeighbours() const {
+    return num_nearest_neighbours;
+}
+
 ForceImpl* qTIP4PForce::createImpl() const {
     return new qTIP4PForceImpl(*this);
 }
