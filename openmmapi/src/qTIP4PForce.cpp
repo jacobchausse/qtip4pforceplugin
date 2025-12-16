@@ -33,6 +33,7 @@
 #include "internal/qTIP4PForceImpl.h"
 #include "openmm/OpenMMException.h"
 #include "openmm/internal/AssertionUtilities.h"
+#include <iostream>
 
 using namespace qTIP4PPlugin;
 using namespace OpenMM;

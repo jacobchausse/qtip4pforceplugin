@@ -38,6 +38,7 @@
 #include <cmath>
 #include <vector>
 #include <omp.h>
+#include <iostream>
 
 using namespace qTIP4PPlugin;
 using namespace OpenMM;
@@ -110,7 +111,6 @@ double ReferenceCalcqTIP4PForceKernel::execute(ContextImpl& context, bool includ
         else {
             max_index2 = min(index1 + num_nearest_neighbours + 1, numWaters);
         }
-
         
         for (int index2 = index1 + 1; index2 < max_index2; index2++) {
             

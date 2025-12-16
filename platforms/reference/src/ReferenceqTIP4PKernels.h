@@ -37,6 +37,7 @@
 #include "openmm/reference/ReferencePlatform.h"
 #include <vector>
 #include <cmath>
+#include <iostream>
 
 using namespace qTIP4PPlugin;
 using namespace OpenMM;
